@@ -1,3 +1,7 @@
-*.so 
-apple_set_os.o
-apple_set_os.efi
+*.so
+*.o
+*.obj
+*.efi
+build/
+tests/protocol_test
+tests/protocol_test.exe

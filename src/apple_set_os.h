@@ -1,8 +1,10 @@
 #ifndef APPLE_SET_OS_H
 #define APPLE_SET_OS_H
 
+extern "C" {
 #include <efibind.h>
 #include <efidef.h>
+}
 
 typedef struct _EFI_SYSTEM_TABLE EFI_SYSTEM_TABLE;
 

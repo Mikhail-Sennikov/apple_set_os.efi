@@ -2,11 +2,9 @@
 
 #include "apple_set_os.h"
 
-#include <efidevp.h>
-#include <eficon.h>
-#include <efiprot.h>
-#include <efiapi.h>
-#include <efierr.h>
+extern "C" {
+#include <efi.h>
+}
 
 #define APPLE_SET_OS_VENDOR  "Apple Inc."
 #define APPLE_SET_OS_VERSION "Mac OS X 10.9"
@@ -21,31 +19,33 @@ typedef struct efi_apple_set_os_interface {
 
 EFI_STATUS apple_set_os_run(EFI_HANDLE image, EFI_SYSTEM_TABLE *systemTable) {
 	SIMPLE_TEXT_OUTPUT_INTERFACE *conOut = systemTable->ConOut;
-	conOut->OutputString(conOut, L"apple_set_os started\r\n");
+	conOut->OutputString(conOut, (CHAR16 *)L"apple_set_os started\r\n");
 
 	efi_apple_set_os_interface *set_os = NULL;
 
 	EFI_STATUS status  = systemTable->BootServices->LocateProtocol(&APPLE_SET_OS_GUID, NULL, (VOID**) &set_os);
 	if(EFI_ERROR(status) || set_os == NULL) {
-		conOut->OutputString(conOut, L"Could not locate the apple set os protocol.\r\n");
+		conOut->OutputString(conOut, (CHAR16 *)L"Could not locate the apple set os protocol.\r\n");
 		return status;
 	}
 
 	if(set_os->version != 0){
 		status = set_os->set_os_version((CHAR8 *) APPLE_SET_OS_VERSION);
 		if(EFI_ERROR(status)){
-			conOut->OutputString(conOut, L"Could not set version.\r\n");
+			conOut->OutputString(conOut, (CHAR16 *)L"Could not set version.\r\n");
 			return status;
 		}
-		conOut->OutputString(conOut, L"Set os version to " APPLE_SET_OS_VERSION  ".\r\n");
+		conOut->OutputString(conOut,
+			(CHAR16 *)L"Set os version to " APPLE_SET_OS_VERSION ".\r\n");
 	}
 
 	status = set_os->set_os_vendor((CHAR8 *) APPLE_SET_OS_VENDOR);
 	if(EFI_ERROR(status)){
-		conOut->OutputString(conOut, L"Could not set vendor.\r\n");
+		conOut->OutputString(conOut, (CHAR16 *)L"Could not set vendor.\r\n");
 		return status;
 	}
-	conOut->OutputString(conOut, L"Set os vendor to " APPLE_SET_OS_VENDOR  ".\r\n");
+	conOut->OutputString(conOut,
+		(CHAR16 *)L"Set os vendor to " APPLE_SET_OS_VENDOR ".\r\n");
 
 	return EFI_SUCCESS;
 }

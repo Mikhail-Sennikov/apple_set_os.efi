@@ -1,4 +1,4 @@
-FROM debian:stretch
+FROM debian:trixie-slim
 
 WORKDIR /build
 

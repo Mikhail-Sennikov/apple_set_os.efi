@@ -24,9 +24,9 @@ boot
 ```
 
 ## Build:
-Tested on Debian Jessie 8.0:
+Requires a C++23 compiler; the Docker build uses Debian Trixie:
 ```
-apt-get install gnu-efi
+apt-get install build-essential gnu-efi
 git clone https://github.com/0xbb/apple_set_os.efi
 cd apple_set_os.efi
 make

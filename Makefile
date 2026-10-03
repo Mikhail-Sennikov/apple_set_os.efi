@@ -2,6 +2,7 @@ ARCH	= x86_64
 
 TARGET	= apple_set_os.efi
 FORMAT 	= efi-app-$(ARCH)
+OBJECTS	= src/main.o src/apple_set_os.o
 
 INC		= /usr/include/efi
 CFLAGS	= -I$(INC) -I$(INC)/$(ARCH) \
@@ -16,11 +17,13 @@ LDFLAGS	= -T /usr/lib/elf_$(ARCH)_efi.lds -Bsymbolic -shared -nostdlib -znocombr
 	objcopy -j .text -j .sdata -j .data -j .dynamic -j .dynsym -j .rel \
 		-j .rela -j .reloc -S --target=$(FORMAT) $^ $@
 
-%.so: %.o
+%.so: $(OBJECTS)
 	$(LD) $(LDFLAGS) -o $@ $^ $(shell $(CC) $(CFLAGS) -print-libgcc-file-name) \
 	/usr/lib/libgnuefi.a
 
 all: $(TARGET)
 
+$(OBJECTS): src/apple_set_os.h
+
 clean:
-	rm -f $(TARGET) *.so apple_set_os.o
+	rm -f $(TARGET) *.so $(OBJECTS)

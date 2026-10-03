@@ -1,7 +1,7 @@
 // Copyright (c) 2015 Bruno Bierbaumer
 
-#include <efibind.h>
-#include <efidef.h>
+#include "apple_set_os.h"
+
 #include <efidevp.h>
 #include <eficon.h>
 #include <efiprot.h>
@@ -19,9 +19,7 @@ typedef struct efi_apple_set_os_interface {
 	EFI_STATUS (EFIAPI *set_os_vendor) (IN CHAR8 *vendor);
 } efi_apple_set_os_interface;
 
-EFI_STATUS
-efi_main(EFI_HANDLE image, EFI_SYSTEM_TABLE *systemTable)
-{
+EFI_STATUS apple_set_os_run(EFI_HANDLE image, EFI_SYSTEM_TABLE *systemTable) {
 	SIMPLE_TEXT_OUTPUT_INTERFACE *conOut = systemTable->ConOut;
 	conOut->OutputString(conOut, L"apple_set_os started\r\n");
 

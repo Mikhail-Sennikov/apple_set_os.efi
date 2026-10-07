@@ -5,7 +5,7 @@ FORMAT 	= efi-app-$(ARCH)
 OBJECTS	= src/main.o src/apple_set_os.o
 
 INC		= /usr/include/efi
-CXXFLAGS	= -I$(INC) -I$(INC)/$(ARCH) \
+CXXFLAGS	= -Isrc -I$(INC) -I$(INC)/$(ARCH) \
 		 -DGNU_EFI_USE_MS_ABI -fPIC -fshort-wchar -ffreestanding \
 		 -fno-stack-protector -maccumulate-outgoing-args \
 		 -Wall -D$(ARCH) -Werror -m64 -mno-red-zone \
@@ -15,7 +15,7 @@ LDFLAGS	= -T /usr/lib/elf_$(ARCH)_efi.lds -Bsymbolic -shared -nostdlib -znocombr
 		  /usr/lib/crt0-efi-$(ARCH).o
 
 %.efi: %.so
-	objcopy -j .text -j .sdata -j .data -j .dynamic -j .dynsym -j .rel \
+	objcopy -j .text -j .sdata -j .data -j .rodata -j .dynamic -j .dynsym -j .rel \
 		-j .rela -j .reloc -S --target=$(FORMAT) $^ $@
 
 %.so: $(OBJECTS)

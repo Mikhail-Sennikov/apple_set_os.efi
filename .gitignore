@@ -1,3 +1,6 @@
 *.so 
 src/*.o
+src/efi/*.o
+src/util/*.o
 apple_set_os.efi
+build/

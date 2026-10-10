@@ -9,13 +9,13 @@ extern "C" {
 #include <string.h>
 #include <type_traits>
 
-static_assert(!std::is_default_constructible_v<TAppleOsInfo>);
-static_assert(!std::is_convertible_v<EFI_SYSTEM_TABLE*, TAppleOsInfo>);
+static_assert(!std::is_default_constructible_v<NEfi::TAppleOsInfo>);
+static_assert(!std::is_convertible_v<EFI_SYSTEM_TABLE*, NEfi::TAppleOsInfo>);
 
 struct TMockAppleOsInfoProtocol {
-	UINTN revision;
-	void (EFIAPI* setOsVersion)(char* version);
-	void (EFIAPI* setOsVendor)(char* vendor);
+	UINTN Revision;
+	void (EFIAPI* SetOsVersion)(char* version);
+	void (EFIAPI* SetOsVendor)(char* vendor);
 };
 
 static constexpr EFI_GUID EXPECTED_APPLE_SET_OS_GUID = {
@@ -109,7 +109,7 @@ static bool RunCase(const char* name, TMockAppleOsInfoProtocol* protocol,
 	CALL_COUNT = 0;
 	OUTPUT_COUNT = 0;
 
-	EFI_STATUS status = apple_set_os_run(nullptr, &systemTable);
+	const EFI_STATUS status = RunAppleSetOs(nullptr, &systemTable);
 	if (status != expectedStatus || CALL_COUNT != expectedCount ||
 		!LOCATE_ARGUMENTS_VALID || !VENDOR_ARGUMENT_VALID || !VERSION_ARGUMENT_VALID ||
 		!OUTPUT_ARGUMENTS_VALID || (useConsole && OUTPUT_COUNT != 3))
@@ -126,8 +126,8 @@ static bool RunCase(const char* name, TMockAppleOsInfoProtocol* protocol,
 	return true;
 }
 
-static bool CheckInactive(const char* name, const TAppleOsInfo& appleOsInfo) {
-	size_t previousCallCount = CALL_COUNT;
+static bool CheckInactive(const char* name, const NEfi::TAppleOsInfo& appleOsInfo) {
+	const size_t previousCallCount = CALL_COUNT;
 	if (appleOsInfo.SetOsVendor("Apple Inc.") ||
 		appleOsInfo.SetOsVersion("Mac OS X 10.9") ||
 		CALL_COUNT != previousCallCount)
@@ -151,7 +151,7 @@ static bool RunWrapperCases() {
 	LOCATE_ARGUMENTS_VALID = false;
 	VENDOR_ARGUMENT_VALID = false;
 	VERSION_ARGUMENT_VALID = false;
-	TAppleOsInfo appleOsInfo(&systemTable);
+	NEfi::TAppleOsInfo appleOsInfo(&systemTable);
 	if (appleOsInfo.GetStatus() != EFI_SUCCESS ||
 		!appleOsInfo.SetOsVendor("Apple Inc.") ||
 		!appleOsInfo.SetOsVersion("Mac OS X 10.9") ||
@@ -164,12 +164,12 @@ static bool RunWrapperCases() {
 	}
 
 	struct TConstructorCase {
-		const char* name;
-		EFI_SYSTEM_TABLE* systemTable;
-		TMockAppleOsInfoProtocol* protocol;
-		EFI_STATUS locateStatus;
-		EFI_STATUS expectedStatus;
-		size_t expectedCallCount;
+		const char* Name;
+		EFI_SYSTEM_TABLE* SystemTable;
+		TMockAppleOsInfoProtocol* Protocol;
+		EFI_STATUS LocateStatus;
+		EFI_STATUS ExpectedStatus;
+		size_t ExpectedCallCount;
 	};
 	const TConstructorCase cases[] = {
 		{ "failed constructor with spurious protocol", &systemTable, &protocol,
@@ -182,19 +182,19 @@ static bool RunWrapperCases() {
 			EFI_SUCCESS, EFI_INVALID_PARAMETER, 0 }
 	};
 	for (const TConstructorCase& testCase : cases) {
-		LOCATED_PROTOCOL = testCase.protocol;
-		LOCATE_STATUS = testCase.locateStatus;
+		LOCATED_PROTOCOL = testCase.Protocol;
+		LOCATE_STATUS = testCase.LocateStatus;
 		LOCATE_ARGUMENTS_VALID = false;
 		CALL_COUNT = 0;
-		TAppleOsInfo failedAppleOsInfo(testCase.systemTable);
-		if (failedAppleOsInfo.GetStatus() != testCase.expectedStatus ||
-			CALL_COUNT != testCase.expectedCallCount ||
-			(testCase.expectedCallCount != 0 && !LOCATE_ARGUMENTS_VALID))
+		NEfi::TAppleOsInfo failedAppleOsInfo(testCase.SystemTable);
+		if (failedAppleOsInfo.GetStatus() != testCase.ExpectedStatus ||
+			CALL_COUNT != testCase.ExpectedCallCount ||
+			(testCase.ExpectedCallCount != 0 && !LOCATE_ARGUMENTS_VALID))
 		{
-			fprintf(stderr, "%s: status or locate call mismatch\n", testCase.name);
+			fprintf(stderr, "%s: status or locate call mismatch\n", testCase.Name);
 			return false;
 		}
-		if (!CheckInactive(testCase.name, failedAppleOsInfo)) {
+		if (!CheckInactive(testCase.Name, failedAppleOsInfo)) {
 			return false;
 		}
 	}
@@ -215,47 +215,47 @@ int main() {
 	{
 		return 1;
 	}
-	protocol.revision = 1;
+	protocol.Revision = 1;
 	if (!RunCase("revision 1", &protocol, EFI_SUCCESS, EFI_SUCCESS,
 		VERSION_ONLY, 2))
 	{
 		return 1;
 	}
-	protocol.revision = 2;
+	protocol.Revision = 2;
 	if (!RunCase("revision 2", &protocol, EFI_SUCCESS, EFI_SUCCESS,
 		VENDOR_THEN_VERSION, 3))
 	{
 		return 1;
 	}
-	protocol.revision = 3;
+	protocol.Revision = 3;
 	if (!RunCase("revision 3", &protocol, EFI_SUCCESS, EFI_SUCCESS,
 		VENDOR_THEN_VERSION, 3))
 	{
 		return 1;
 	}
 
-	protocol.setOsVendor = nullptr;
+	protocol.SetOsVendor = nullptr;
 	if (!RunCase("missing vendor callback", &protocol, EFI_SUCCESS, EFI_SUCCESS,
 		VERSION_ONLY, 2))
 	{
 		return 1;
 	}
-	protocol.setOsVendor = MockVendor;
-	protocol.setOsVersion = nullptr;
+	protocol.SetOsVendor = MockVendor;
+	protocol.SetOsVersion = nullptr;
 	if (!RunCase("missing version callback", &protocol, EFI_SUCCESS, EFI_SUCCESS,
 		VENDOR_ONLY, 2))
 	{
 		return 1;
 	}
-	protocol.setOsVendor = nullptr;
+	protocol.SetOsVendor = nullptr;
 	if (!RunCase("missing both callbacks", &protocol, EFI_SUCCESS, EFI_SUCCESS,
 		LOCATE_ONLY, 1))
 	{
 		return 1;
 	}
 
-	protocol.setOsVendor = MockVendor;
-	protocol.setOsVersion = MockVersion;
+	protocol.SetOsVendor = MockVendor;
+	protocol.SetOsVersion = MockVersion;
 	if (!RunCase("success with null protocol", nullptr, EFI_SUCCESS,
 		EFI_NOT_FOUND, LOCATE_ONLY, 1))
 	{
@@ -284,8 +284,8 @@ int main() {
 
 	CALL_COUNT = 0;
 	EFI_SYSTEM_TABLE systemTable = {};
-	if (apple_set_os_run(nullptr, nullptr) != EFI_INVALID_PARAMETER ||
-		apple_set_os_run(nullptr, &systemTable) != EFI_INVALID_PARAMETER ||
+	if (RunAppleSetOs(nullptr, nullptr) != EFI_INVALID_PARAMETER ||
+		RunAppleSetOs(nullptr, &systemTable) != EFI_INVALID_PARAMETER ||
 		CALL_COUNT != 0)
 	{
 		fputs("invalid system table must not access boot services\n", stderr);

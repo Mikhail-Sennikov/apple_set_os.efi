@@ -2,7 +2,10 @@
 
 struct _EFI_SYSTEM_TABLE;
 using EFI_SYSTEM_TABLE = _EFI_SYSTEM_TABLE;
+
 struct _SIMPLE_TEXT_OUTPUT_INTERFACE;
+
+namespace NUtil {
 
 class TConsoleOut {
 public:
@@ -10,5 +13,7 @@ public:
 	void Write(const wchar_t* text) const;
 
 private:
-	_SIMPLE_TEXT_OUTPUT_INTERFACE* conOut;
+	_SIMPLE_TEXT_OUTPUT_INTERFACE* ConsoleOut_;
 };
+
+} // namespace NUtil

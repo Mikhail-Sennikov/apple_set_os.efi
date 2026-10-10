@@ -8,6 +8,8 @@ extern "C" {
 struct _EFI_SYSTEM_TABLE;
 using EFI_SYSTEM_TABLE = _EFI_SYSTEM_TABLE;
 
+namespace NEfi {
+
 class TAppleOsInfo {
 public:
 	explicit TAppleOsInfo(EFI_SYSTEM_TABLE* systemTable);
@@ -19,6 +21,8 @@ public:
 
 private:
 	struct TProtocol;
-	TProtocol* protocol = nullptr;
-	EFI_STATUS status;
+	TProtocol* Protocol_ = nullptr;
+	EFI_STATUS Status_;
 };
+
+} // namespace NEfi

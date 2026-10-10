@@ -6,7 +6,7 @@ extern "C" {
 #include <stddef.h>
 #include <stdio.h>
 
-static_assert(sizeof(TConsoleOut) == sizeof(void*));
+static_assert(sizeof(NUtil::TConsoleOut) == sizeof(void*));
 
 static SIMPLE_TEXT_OUTPUT_INTERFACE* EXPECTED_CON_OUT;
 static const void* EXPECTED_TEXT;
@@ -22,7 +22,7 @@ static EFI_STATUS EFIAPI MockOutputString(SIMPLE_TEXT_OUTPUT_INTERFACE* conOut,
 	return OUTPUT_STATUS;
 }
 
-static bool CheckWrite(const char* name, const TConsoleOut& console,
+static bool CheckWrite(const char* name, const NUtil::TConsoleOut& console,
 	const wchar_t* text, size_t repeats = 1) {
 	EXPECTED_TEXT = static_cast<const void*>(text);
 	OUTPUT_COUNT = 0;
@@ -42,7 +42,7 @@ int main() {
 	conOut.OutputString = MockOutputString;
 	EFI_SYSTEM_TABLE systemTable{};
 	systemTable.ConOut = &conOut;
-	TConsoleOut console(&systemTable);
+	NUtil::TConsoleOut console(&systemTable);
 	EXPECTED_CON_OUT = &conOut;
 	OUTPUT_STATUS = EFI_SUCCESS;
 
@@ -60,9 +60,9 @@ int main() {
 
 	OUTPUT_COUNT = 0;
 	console.Write(nullptr);
-	TConsoleOut(nullptr).Write(L"no system table");
+	NUtil::TConsoleOut(nullptr).Write(L"no system table");
 	EFI_SYSTEM_TABLE noConsoleTable{};
-	TConsoleOut(&noConsoleTable).Write(L"no console");
+	NUtil::TConsoleOut(&noConsoleTable).Write(L"no console");
 	conOut.OutputString = nullptr;
 	console.Write(L"no callback");
 	if (OUTPUT_COUNT != 0) {

@@ -15,7 +15,7 @@ This fork uses the Apple OS Info ABI: a native-width `UINTN` revision and
 The vendor callback is called for revision 2 or later, followed by the OS
 version callback for any non-zero revision. Missing callbacks are skipped.
 
-The application constructs `TAppleOsInfo` with the EFI system table, checks
+The application constructs `NEfi::TAppleOsInfo` with the EFI system table, checks
 `GetStatus()`, and uses ordinary `SetOsVendor` and `SetOsVersion` methods.
 The raw protocol layout and callback ABI are private
 to `src/efi/apple_os_info.cpp`; setter results indicate whether a callback was invoked.

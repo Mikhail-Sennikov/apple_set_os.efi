@@ -1,8 +1,6 @@
-// Copyright (c) 2015 Bruno Bierbaumer
-
 #include <apple_set_os.h>
 #include <efi/apple_os_info.h>
-#include <util/console_out.h>
+#include <logging/logging.h>
 
 extern "C" {
 #include <efi.h>
@@ -16,22 +14,21 @@ EFI_STATUS RunAppleSetOs(EFI_HANDLE image, EFI_SYSTEM_TABLE* systemTable) {
 		return EFI_INVALID_PARAMETER;
 	}
 
-	NUtil::TConsoleOut consoleOut(systemTable);
-	consoleOut.Write(L"apple_set_os started\r\n");
+	NLogging::Log(systemTable, L"apple_set_os started\n");
 
 	NEfi::TAppleOsInfo appleOsInfo(systemTable);
 	const EFI_STATUS status = appleOsInfo.GetStatus();
 	if (status != EFI_SUCCESS) {
-		consoleOut.Write(L"Could not locate the apple set os protocol.\r\n");
+		NLogging::Log(systemTable, L"Could not locate the apple set os protocol.\n");
 		return status;
 	}
 
 	if (appleOsInfo.SetOsVendor(APPLE_SET_OS_VENDOR)) {
-		consoleOut.Write(L"Set os vendor to " APPLE_SET_OS_VENDOR ".\r\n");
+		NLogging::Log(systemTable, L"Set os vendor to " APPLE_SET_OS_VENDOR ".\n");
 	}
 
 	if (appleOsInfo.SetOsVersion(APPLE_SET_OS_VERSION)) {
-		consoleOut.Write(L"Set os version to " APPLE_SET_OS_VERSION ".\r\n");
+		NLogging::Log(systemTable, L"Set os version to " APPLE_SET_OS_VERSION ".\n");
 	}
 
 	return EFI_SUCCESS;

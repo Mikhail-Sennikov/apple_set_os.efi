@@ -1,30 +1,36 @@
 # apple_set_os.efi
-Tiny EFI program for unlocking the Intel IGD on the Macbook Pro 11,3 for Linux and Windows.  
-It has been made to be easily chainloaded by unmodified EFI bootloader like Grub, rEFInd etc.
 
-The Macbook Pro 11,3 model's EFI is switching off the Intel GPU if you boot anything but Mac OS X.  
-So a little trick by faking the OS identifiction is required to make all hardware accessible.
+Tiny EFI utility for making the Intel integrated GPU available when booting
+Linux or Windows on affected Intel-based Macs.
 
-All credits belong to [Andreas Heider](https://github.com/ah-) who originally discovered this hack:  
-https://lists.gnu.org/archive/html/grub-devel/2013-12/msg00442.html
+Apple firmware can hide the Intel GPU when booting a non-macOS system.
+The utility identifies the OS as macOS through the Apple OS Info protocol.
 
-## Protocol fixes
+This fork has been tested on `MacBookPro16,4` with Intel UHD Graphics 630,
+using Clover to load the utility as an EFI driver before Windows.
 
-This fork uses the Apple OS Info ABI: a native-width `UINTN` revision and
-`void EFIAPI` callbacks. These callbacks do not return `EFI_STATUS`.
-The vendor callback is called for revision 2 or later, followed by the OS
-version callback for any non-zero revision. Missing callbacks are skipped.
+## Credits
 
-The application constructs `NEfi::TAppleOsInfo` with the EFI system table, checks
-`GetStatus()`, and uses ordinary `SetOsVendor` and `SetOsVersion` methods.
-The raw protocol layout and callback ABI are private
-to `src/efi/apple_os_info.cpp`; setter results indicate whether a callback was invoked.
+Thanks to Bruno Bierbaumer for the original
+[apple_set_os.efi](https://github.com/0xbb/apple_set_os.efi) project on which this fork is based.
+The original project targeted `MacBookPro11,3`.
 
-`make test` checks the ABI, callback order and arguments, protocol lookup
-failures, and operation without console output, using real GNU-EFI headers.
-The EFI build links the GNU-EFI entry-point support and rejects undefined symbols.
+Thanks to [Andreas Heider](https://github.com/ah-) for discovering
+[the underlying hack](https://lists.gnu.org/archive/html/grub-devel/2013-12/msg00442.html).
 
-## Usage:
+## Usage
+
+### Clover (UEFI driver)
+
+Build the [Clover EFI driver](#clover-efi-driver), then copy `apple_set_os.efi` to
+`\EFI\CLOVER\drivers\UEFI\apple_set_os.efi` on the EFI System Partition that
+contains Clover (not necessarily the Windows ESP).
+
+Boot through Clover and select Windows normally. Clover loads the driver during
+startup, before launching Windows; do not add it as a chainloader menu entry.
+
+### rEFInd and GRUB (EFI application)
+
 Copy the apple_set_os.efi binary (download it from [releases](https://github.com/0xbb/apple_set_os.efi/releases)) to EFI System Partition (ESP) :
 ```
 mkdir /boot/efi/EFI/custom
@@ -39,18 +45,46 @@ chainloader (${root})/EFI/custom/apple_set_os.efi
 boot
 ```
 
-## Build:
-Requires a C++23 compiler; the Docker build uses Debian Trixie:
-```
-apt-get install build-essential gnu-efi
-git clone https://github.com/0xbb/apple_set_os.efi
+## Build
+
+The build targets x86_64 UEFI and requires a C++23 compiler and GNU-EFI.
+The output is `apple_set_os.efi` in the repository root, an EFI application by default.
+
+### Debian Trixie (x86_64)
+
+```sh
+sudo apt-get update
+sudo apt-get install -y build-essential git gnu-efi
+git clone https://github.com/Mikhail-Sennikov/apple_set_os.efi.git
 cd apple_set_os.efi
+make clean
 make test
 make
 ```
-## Build via docker
-```bash
-docker build -t apple_set_os . && docker run --rm -it -v $(pwd):/build apple_set_os
+
+### Docker
+
+The Dockerfile uses Debian Trixie. From the repository root, with Docker running
+Linux containers (the commands work in Bash and PowerShell):
+
+```sh
+docker build -t apple_set_os .
+docker run --rm --mount type=bind,source=.,target=/build apple_set_os sh -c "make clean && make test && make"
 ```
 
+The repository is [bind-mounted](https://docs.docker.com/engine/storage/bind-mounts/)
+at `/build`, so the output remains on the host.
 
+### Clover EFI driver
+
+To build a boot-services driver instead of an application:
+
+```sh
+make clean
+make test
+make FORMAT=efi-bsdrv-x86_64
+```
+
+For Docker, replace the final `make` in the container command with
+`make FORMAT=efi-bsdrv-x86_64`. Both formats use the same output filename;
+always run `make clean` when switching formats.

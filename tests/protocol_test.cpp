@@ -90,12 +90,20 @@ static EFI_STATUS EFIAPI MockOutputString(SIMPLE_TEXT_OUTPUT_INTERFACE* conOut,
 static bool RunCase(const char* name, TMockAppleOsInfoProtocol* protocol,
 	EFI_STATUS locateResult, EFI_STATUS expectedStatus,
 	const ECall* expectedCalls, size_t expectedCount, bool useConsole = false) {
-	EFI_BOOT_SERVICES bootServices = {};
-	EFI_SYSTEM_TABLE systemTable = {};
-	SIMPLE_TEXT_OUTPUT_INTERFACE conOut = {};
+	// GNU-EFI remembers the first system table; these fixtures must outlive each call.
+	static EFI_BOOT_SERVICES bootServices;
+	static EFI_SYSTEM_TABLE systemTable;
+	static SIMPLE_TEXT_OUTPUT_INTERFACE conOut;
+	static SIMPLE_TEXT_OUTPUT_MODE conOutMode;
+	bootServices = {};
+	systemTable = {};
+	conOut = {};
+	conOutMode = {};
+	conOutMode.Attribute = EFI_TEXT_ATTR(EFI_LIGHTGRAY, EFI_BLACK);
 	bootServices.LocateProtocol = MockLocateProtocol;
 	systemTable.BootServices = &bootServices;
 	conOut.OutputString = MockOutputString;
+	conOut.Mode = &conOutMode;
 	if (useConsole) {
 		systemTable.ConOut = &conOut;
 	}

@@ -7,7 +7,7 @@ Apple firmware can hide the Intel GPU when booting a non-macOS system.
 The utility identifies the OS as macOS through the Apple OS Info protocol.
 
 This fork has been tested on `MacBookPro16,4` with Intel UHD Graphics 630,
-using Clover to load the utility as an EFI driver before Windows.
+using Clover to run the utility automatically before Windows.
 
 ## Credits
 
@@ -20,14 +20,15 @@ Thanks to [Andreas Heider](https://github.com/ah-) for discovering
 
 ## Usage
 
-### Clover (UEFI driver)
+### Clover
 
-Build the [Clover EFI driver](#clover-efi-driver), then copy `apple_set_os.efi` to
+Build the [EFI application](#build), then copy `apple_set_os.efi` to
 `\EFI\CLOVER\drivers\UEFI\apple_set_os.efi` on the EFI System Partition that
 contains Clover (not necessarily the Windows ESP).
 
-Boot through Clover and select Windows normally. Clover loads the driver during
-startup, before launching Windows; do not add it as a chainloader menu entry.
+Boot through Clover and select Windows normally. Clover runs the utility from
+the drivers directory during startup, before launching Windows; do not add it
+as a chainloader menu entry. Load only one copy of Apple Set OS.
 
 ### rEFInd and GRUB (EFI application)
 
@@ -48,9 +49,9 @@ boot
 ## Build
 
 The build targets x86_64 UEFI and requires a C++23 compiler and GNU-EFI.
-The output is `apple_set_os.efi` in the repository root, an EFI application by default.
+`make` produces one `apple_set_os.efi` (EFI application) in the repository root.
 
-### Debian Trixie (x86_64)
+### Debian (x86_64)
 
 ```sh
 sudo apt-get update
@@ -74,17 +75,3 @@ docker run --rm --mount type=bind,source=.,target=/build apple_set_os sh -c "mak
 
 The repository is [bind-mounted](https://docs.docker.com/engine/storage/bind-mounts/)
 at `/build`, so the output remains on the host.
-
-### Clover EFI driver
-
-To build a boot-services driver instead of an application:
-
-```sh
-make clean
-make test
-make FORMAT=efi-bsdrv-x86_64
-```
-
-For Docker, replace the final `make` in the container command with
-`make FORMAT=efi-bsdrv-x86_64`. Both formats use the same output filename;
-always run `make clean` when switching formats.

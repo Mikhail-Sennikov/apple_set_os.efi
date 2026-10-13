@@ -1,4 +1,6 @@
+#include <debug/apple_os_info.h>
 #include <efi/apple_os_info.h>
+#include <logging/logging.h>
 
 extern "C" {
 #include <efi.h>
@@ -26,7 +28,10 @@ struct TAppleOsInfo::TProtocol {
 	void (EFIAPI* SetOsVendor)(char* vendor);
 };
 
-TAppleOsInfo::TAppleOsInfo(EFI_SYSTEM_TABLE* systemTable) : Status_(EFI_INVALID_PARAMETER) {
+TAppleOsInfo::TAppleOsInfo(EFI_SYSTEM_TABLE* systemTable)
+	: SystemTable_(systemTable)
+	, Status_(EFI_INVALID_PARAMETER)
+{
 	using TExpectedCallback = void (__attribute__((ms_abi))*)(char* value);
 	static_assert(std::is_same_v<decltype(TProtocol::SetOsVersion), TExpectedCallback>,
 		"Apple callbacks must return void and use the Microsoft x64 ABI");
@@ -43,17 +48,33 @@ TAppleOsInfo::TAppleOsInfo(EFI_SYSTEM_TABLE* systemTable) : Status_(EFI_INVALID_
 	}
 
 	void* locatedProtocol = nullptr;
-	Status_ = systemTable->BootServices->LocateProtocol(
-		&APPLE_SET_OS_GUID, nullptr, &locatedProtocol);
-	if (Status_ != EFI_SUCCESS) {
-		return;
-	}
-	if (locatedProtocol == nullptr) {
-		Status_ = EFI_NOT_FOUND;
-		return;
+	const EFI_STATUS lookupStatus = systemTable->BootServices->LocateProtocol(
+		/* protocol */ &APPLE_SET_OS_GUID,
+		/* registration */ nullptr,
+		/* interface */ &locatedProtocol);
+	Status_ = lookupStatus;
+	if (Status_ == EFI_SUCCESS) {
+		if (locatedProtocol == nullptr) {
+			Status_ = EFI_NOT_FOUND;
+		} else {
+			Protocol_ = static_cast<TProtocol*>(locatedProtocol);
+		}
 	}
 
-	Protocol_ = static_cast<TProtocol*>(locatedProtocol);
+	const uint64_t revision = Protocol_ != nullptr ? Protocol_->Revision : 0;
+	// Older revisions may not contain the newer callback fields at all.
+	const bool hasVersionCallback = Protocol_ != nullptr && revision > 0 &&
+		Protocol_->SetOsVersion != nullptr;
+	const bool hasVendorCallback = Protocol_ != nullptr && revision >= 2 &&
+		Protocol_->SetOsVendor != nullptr;
+	NDebug::LogProtocolLookup(
+		/* systemTable */ systemTable,
+		/* lookupStatus */ lookupStatus,
+		/* resultStatus */ Status_,
+		/* pointerPresent */ locatedProtocol != nullptr,
+		/* revision */ revision,
+		/* hasVersionCallback */ hasVersionCallback,
+		/* hasVendorCallback */ hasVendorCallback);
 }
 
 EFI_STATUS TAppleOsInfo::GetStatus() const {
@@ -61,24 +82,42 @@ EFI_STATUS TAppleOsInfo::GetStatus() const {
 }
 
 bool TAppleOsInfo::SetOsVendor(const char* vendor) const {
-	if (Protocol_ == nullptr ||
-		Protocol_->Revision < 2 ||
-		Protocol_->SetOsVendor == nullptr)
-	{
+	if (Protocol_ == nullptr) {
+		NLogging::Log(SystemTable_, L"[vendor] skipped reason=protocol_unavailable\n");
 		return false;
 	}
+	if (Protocol_->Revision < 2) {
+		NLogging::Log(SystemTable_, L"[vendor] skipped reason=unsupported_revision\n");
+		return false;
+	}
+	if (Protocol_->SetOsVendor == nullptr) {
+		NLogging::Log(SystemTable_, L"[vendor] skipped reason=null_callback\n");
+		return false;
+	}
+
+	NLogging::Log(SystemTable_, L"[vendor] call argument=\"%a\"\n", vendor);
 	Protocol_->SetOsVendor(const_cast<char*>(vendor));
+	NLogging::Log(SystemTable_, L"[vendor] success\n");
 	return true;
 }
 
 bool TAppleOsInfo::SetOsVersion(const char* version) const {
-	if (Protocol_ == nullptr ||
-		Protocol_->Revision == 0 ||
-		Protocol_->SetOsVersion == nullptr)
-	{
+	if (Protocol_ == nullptr) {
+		NLogging::Log(SystemTable_, L"[version] skipped reason=protocol_unavailable\n");
 		return false;
 	}
+	if (Protocol_->Revision == 0) {
+		NLogging::Log(SystemTable_, L"[version] skipped reason=unsupported_revision\n");
+		return false;
+	}
+	if (Protocol_->SetOsVersion == nullptr) {
+		NLogging::Log(SystemTable_, L"[version] skipped reason=null_callback\n");
+		return false;
+	}
+
+	NLogging::Log(SystemTable_, L"[version] call argument=\"%a\"\n", version);
 	Protocol_->SetOsVersion(const_cast<char*>(version));
+	NLogging::Log(SystemTable_, L"[version] success\n");
 	return true;
 }
 

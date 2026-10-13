@@ -36,8 +36,7 @@ static size_t POOL_OPERATIONS;
 static bool OUTPUT_VALID;
 static EFI_STATUS OUTPUT_STATUS;
 
-static EFI_STATUS EFIAPI MockOutputString(SIMPLE_TEXT_OUTPUT_INTERFACE* conOut,
-	CHAR16* text) {
+static EFI_STATUS EFIAPI MockOutputString(SIMPLE_TEXT_OUTPUT_INTERFACE* conOut, CHAR16* text) {
 	++OUTPUT_CALLS;
 	if (conOut != &CONSOLE || text == nullptr) {
 		OUTPUT_VALID = false;
@@ -117,11 +116,13 @@ static bool CheckText(const wchar_t* expected, const char* message) {
 }
 
 static bool CheckNoOutput(const char* message) {
-	return Check(OUTPUT_CALLS == 0 && CONTENT_LENGTH == 0 && POOL_OPERATIONS == 0,
-		message);
+	return Check(OUTPUT_CALLS == 0 && CONTENT_LENGTH == 0 && POOL_OPERATIONS == 0, message);
 }
 
 static bool CheckSilentLog(EFI_SYSTEM_TABLE* systemTable, const char* message) {
+	if (!Check(!NLogging::IsAvailable(systemTable), "invalid console must not be available")) {
+		return false;
+	}
 	NLogging::Log(systemTable, L"must not appear\n");
 	return CheckNoOutput(message);
 }
@@ -135,7 +136,7 @@ static bool CheckInvalidInputs() {
 		return false;
 	}
 	SYSTEM_TABLE.BootServices = &SERVICES;
-	NLogging::Log(&SYSTEM_TABLE, nullptr);
+	NLogging::Log(&SYSTEM_TABLE, /* format */ nullptr);
 	if (!CheckNoOutput("null format: unexpected console call")) {
 		return false;
 	}
@@ -160,22 +161,37 @@ static bool CheckInvalidInputs() {
 static bool CheckBeforeFirstOutput() {
 	ResetFixture();
 	if (!Check(ST == nullptr && BS == nullptr, "GNU-EFI initialized before the first log") ||
+		!Check(NLogging::IsAvailable(&SYSTEM_TABLE), "valid console must be available before initialization") ||
 		!CheckInvalidInputs())
 	{
 		return false;
 	}
-	return Check(ST == nullptr && BS == nullptr,
-		"invalid first calls must not initialize GNU-EFI");
+	OTHER_SYSTEM_TABLE = SYSTEM_TABLE;
+	if (!Check(
+		NLogging::IsAvailable(&OTHER_SYSTEM_TABLE),
+		"a capability query must not bind the logging session to a system table"))
+	{
+		return false;
+	}
+	return Check(ST == nullptr && BS == nullptr, "capability queries and invalid calls must not initialize GNU-EFI") &&
+		CheckNoOutput("capability queries must not write to the console or allocate memory");
 }
 
 static bool CheckFormatting() {
 	ResetFixture();
-	NLogging::Log(&SYSTEM_TABLE, L"status=%r text=%a count=%d id=%04x raw=%016lx\n",
-		EFI_DEVICE_ERROR, "Apple Inc.", UINT32{42}, UINT32{0x8086}, UINT64{0x123456789abcdef0});
-	return Check(ST == &SYSTEM_TABLE && BS == &SERVICES,
-		"first valid log must initialize GNU-EFI") && CheckText(
-		L"status=Device Error text=Apple Inc. count=42 id=8086 raw=123456789ABCDEF0\r\n",
-		"formatted output: EFI status, ASCII text and numeric arguments");
+	NLogging::Log(
+		/* systemTable */ &SYSTEM_TABLE,
+		/* format */ L"status=%r text=%a count=%d id=%04x raw=%016lx\n",
+		/* status */ EFI_DEVICE_ERROR,
+		/* text */ "Apple Inc.",
+		/* count */ UINT32{42},
+		/* id */ UINT32{0x8086},
+		/* raw */ UINT64{0x123456789abcdef0});
+	return Check(ST == &SYSTEM_TABLE && BS == &SERVICES, "first valid log must initialize GNU-EFI") &&
+		Check(NLogging::IsAvailable(&SYSTEM_TABLE), "bound console must remain available") &&
+		CheckText(
+			L"status=Device Error text=Apple Inc. count=42 id=8086 raw=123456789ABCDEF0\r\n",
+			"formatted output: EFI status, ASCII text and numeric arguments");
 }
 
 static bool CheckBasicOutput() {
@@ -204,22 +220,39 @@ static bool CheckBasicOutput() {
 
 static bool CheckGuards() {
 	ResetFixture();
-	if (!CheckInvalidInputs() ||
-		!Check(ST == &SYSTEM_TABLE && BS == &SERVICES,
-			"invalid later calls must preserve GNU-EFI global pointers"))
+	if (!CheckInvalidInputs()) {
+		return false;
+	}
+	if (!Check(
+		ST == &SYSTEM_TABLE && BS == &SERVICES,
+		"invalid later calls must preserve GNU-EFI global pointers"))
 	{
 		return false;
 	}
 	OTHER_SYSTEM_TABLE = SYSTEM_TABLE;
-	if (!CheckSilentLog(&OTHER_SYSTEM_TABLE,
-		"different cached GNU-EFI table: unexpected console call") ||
-		!Check(ST == &SYSTEM_TABLE && BS == &SERVICES,
-			"different table must not change GNU-EFI global pointers"))
+	if (!CheckSilentLog(&OTHER_SYSTEM_TABLE, "different cached GNU-EFI table: unexpected console call")) {
+		return false;
+	}
+	if (!Check(
+		ST == &SYSTEM_TABLE && BS == &SERVICES,
+		"different table must not change GNU-EFI global pointers"))
 	{
 		return false;
 	}
+	ST = &OTHER_SYSTEM_TABLE;
+	if (!CheckSilentLog(&SYSTEM_TABLE, "changed GNU-EFI table: unexpected console call")) {
+		return false;
+	}
+	if (!Check(ST == &OTHER_SYSTEM_TABLE, "capability query must not repair a changed GNU-EFI table")) {
+		return false;
+	}
+	ST = &SYSTEM_TABLE;
+	if (!Check(NLogging::IsAvailable(&SYSTEM_TABLE), "restored GNU-EFI table must be available")) {
+		return false;
+	}
 	NLogging::Log(&SYSTEM_TABLE, L"original table still works\n");
-	return CheckText(L"original table still works\r\n",
+	return CheckText(
+		L"original table still works\r\n",
 		"original table must remain usable after rejected calls");
 }
 
@@ -227,9 +260,9 @@ static bool CheckConsoleError() {
 	ResetFixture();
 	OUTPUT_STATUS = EFI_DEVICE_ERROR;
 	NLogging::Log(&SYSTEM_TABLE, L"firmware rejected this output\n");
-	if (!Check(OUTPUT_CALLS != 0 && CONTENT_LENGTH == 0 && OUTPUT_VALID &&
-		POOL_OPERATIONS == 0, "console error: invalid callback or unexpected pool operation"))
-	{
+	const bool consoleCallValid =
+		OUTPUT_CALLS != 0 && CONTENT_LENGTH == 0 && OUTPUT_VALID && POOL_OPERATIONS == 0;
+	if (!Check(consoleCallValid, "console error: invalid callback or unexpected pool operation")) {
 		return false;
 	}
 	ClearCapture();
@@ -250,16 +283,22 @@ static bool CheckLongOutput() {
 		} else {
 			NLogging::Log(&SYSTEM_TABLE, L"%s", longArgument);
 		}
-		if (!Check(OUTPUT_VALID && CONTENT_LENGTH == LONG_TEXT_LENGTH + 1,
-			"long literal and long %s argument: output must not be truncated") ||
-			!Check(POOL_OPERATIONS == 0, "long output: no pool allocations or frees") ||
-			!Check(CONTENTS[LONG_TEXT_LENGTH - 1] == L'\r' &&
-				CONTENTS[LONG_TEXT_LENGTH] == L'\n', "long output: exactly one final CRLF"))
-		{
+		const bool outputComplete = OUTPUT_VALID && CONTENT_LENGTH == LONG_TEXT_LENGTH + 1;
+		if (!Check(outputComplete, "long literal and long %s argument: output must not be truncated")) {
+			return false;
+		}
+		const bool noPoolOperations = POOL_OPERATIONS == 0;
+		if (!Check(noPoolOperations, "long output: no pool allocations or frees")) {
+			return false;
+		}
+		const bool lineEndingCorrect =
+			CONTENTS[LONG_TEXT_LENGTH - 1] == L'\r' && CONTENTS[LONG_TEXT_LENGTH] == L'\n';
+		if (!Check(lineEndingCorrect, "long output: exactly one final CRLF")) {
 			return false;
 		}
 		for (size_t index = 0; index < LONG_TEXT_LENGTH - 1; ++index) {
-			if (!Check(CONTENTS[index] == static_cast<CHAR16>(LONG_TEXT[index]),
+			if (!Check(
+				CONTENTS[index] == static_cast<CHAR16>(LONG_TEXT[index]),
 				"long output: prefix, body and tail must be preserved"))
 			{
 				return false;

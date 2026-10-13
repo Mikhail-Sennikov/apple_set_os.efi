@@ -22,6 +22,7 @@ public:
 private:
 	struct TProtocol;
 	TProtocol* Protocol_ = nullptr;
+	EFI_SYSTEM_TABLE* SystemTable_;
 	EFI_STATUS Status_;
 };
 

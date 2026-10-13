@@ -1,6 +1,7 @@
 #include <apple_set_os.h>
+#include <debug/boot_environment.h>
+#include <debug/gpu.h>
 #include <efi/apple_os_info.h>
-#include <logging/logging.h>
 
 extern "C" {
 #include <efi.h>
@@ -14,22 +15,17 @@ EFI_STATUS RunAppleSetOs(EFI_HANDLE image, EFI_SYSTEM_TABLE* systemTable) {
 		return EFI_INVALID_PARAMETER;
 	}
 
-	NLogging::Log(systemTable, L"apple_set_os started\n");
+	NDebug::LogBootEnvironment(image, systemTable);
+	NDebug::LogGpuList(/* systemTable */ systemTable, /* phase */ L"before");
 
 	NEfi::TAppleOsInfo appleOsInfo(systemTable);
 	const EFI_STATUS status = appleOsInfo.GetStatus();
-	if (status != EFI_SUCCESS) {
-		NLogging::Log(systemTable, L"Could not locate the apple set os protocol.\n");
-		return status;
+	if (status == EFI_SUCCESS) {
+		appleOsInfo.SetOsVendor(APPLE_SET_OS_VENDOR);
+		appleOsInfo.SetOsVersion(APPLE_SET_OS_VERSION);
 	}
 
-	if (appleOsInfo.SetOsVendor(APPLE_SET_OS_VENDOR)) {
-		NLogging::Log(systemTable, L"Set os vendor to " APPLE_SET_OS_VENDOR ".\n");
-	}
-
-	if (appleOsInfo.SetOsVersion(APPLE_SET_OS_VERSION)) {
-		NLogging::Log(systemTable, L"Set os version to " APPLE_SET_OS_VERSION ".\n");
-	}
-
-	return EFI_SUCCESS;
+	NDebug::LogGpuList(/* systemTable */ systemTable, /* phase */ L"after");
+	NDebug::LogResult(systemTable, status);
+	return status;
 }

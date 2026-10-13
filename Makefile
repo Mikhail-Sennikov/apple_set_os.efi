@@ -1,4 +1,5 @@
 ARCH	= x86_64
+GNU_EFI ?= /usr
 .DEFAULT_GOAL := all
 .DELETE_ON_ERROR:
 CORE_SOURCES = src/apple_set_os.cpp src/efi/apple_os_info.cpp src/logging/logging.cpp
@@ -17,22 +18,25 @@ OBJECTS = $(patsubst src/%.cpp,$(BUILD_DIR)/%.o,$(SOURCES))
 SHARED = $(BUILD_DIR)/apple_set_os.so
 TEST_TARGETS = build/tests/protocol_test build/tests/logging_test build/tests/debug_test
 
-INC		= /usr/include/efi
+INC		= $(GNU_EFI)/include/efi
+EFI_LIBS = $(GNU_EFI)/lib/libefi.a $(GNU_EFI)/lib/libgnuefi.a
 CXXFLAGS	= -Isrc -I$(INC) -I$(INC)/$(ARCH) \
 		 -DGNU_EFI_USE_MS_ABI -fPIC -fshort-wchar -ffreestanding \
 		 -fno-stack-protector -maccumulate-outgoing-args \
 		 -Wall -D$(ARCH) -Werror -m64 -mno-red-zone \
-		 -std=c++23 -Os -fno-exceptions -fno-rtti -fno-threadsafe-statics
+		 -std=c++23 -Os -flto -fvisibility=hidden \
+		 -fno-exceptions -fno-rtti -fno-threadsafe-statics
 
-LDFLAGS	= --no-undefined -T /usr/lib/elf_$(ARCH)_efi.lds -Bsymbolic -shared -nostdlib -znocombreloc \
-		  /usr/lib/crt0-efi-$(ARCH).o
+LDFLAGS	= -nostdlib -shared \
+		 -Wl,--no-undefined,-T,$(GNU_EFI)/lib/elf_$(ARCH)_efi.lds \
+		 -Wl,-Bsymbolic,-znocombreloc,--exclude-libs,ALL
 
 $(TARGET): $(SHARED) Makefile
 	objcopy -j .text -j .sdata -j .data -j .rodata -j .dynamic -j .dynsym -j .rel \
 		-j .rela -j .reloc -S --target=$(FORMAT) $< $@
 
 $(SHARED): $(OBJECTS) Makefile
-	$(LD) $(LDFLAGS) -o $@ $(OBJECTS) /usr/lib/libefi.a /usr/lib/libgnuefi.a \
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) -o $@ $(GNU_EFI)/lib/crt0-efi-$(ARCH).o $(OBJECTS) $(EFI_LIBS) \
 		$(shell $(CXX) $(CXXFLAGS) -print-libgcc-file-name)
 
 $(BUILD_DIR)/%.o: src/%.cpp Makefile
@@ -52,16 +56,16 @@ all: $(TARGET)
 build/tests/protocol_test: tests/protocol_test.cpp $(BUILD_INPUTS) $(BUILD_DIR)/build-id
 	mkdir -p $(dir $@)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $(BUILD_CPPFLAGS) -o $@ \
-		tests/protocol_test.cpp $(CORE_SOURCES) $(DEBUG_SOURCES) /usr/lib/libefi.a /usr/lib/libgnuefi.a
+		tests/protocol_test.cpp $(CORE_SOURCES) $(DEBUG_SOURCES) $(EFI_LIBS)
 
 build/tests/logging_test: tests/logging_test.cpp src/logging/logging.cpp src/logging/logging.h Makefile
 	mkdir -p $(dir $@)
-	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -o $@ tests/logging_test.cpp src/logging/logging.cpp /usr/lib/libefi.a /usr/lib/libgnuefi.a
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -o $@ tests/logging_test.cpp src/logging/logging.cpp $(EFI_LIBS)
 
 build/tests/debug_test: tests/debug_test.cpp $(BUILD_INPUTS) $(BUILD_DIR)/build-id
 	mkdir -p $(dir $@)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $(BUILD_CPPFLAGS) -o $@ \
-		tests/debug_test.cpp $(CORE_SOURCES) $(DEBUG_SOURCES) /usr/lib/libefi.a /usr/lib/libgnuefi.a
+		tests/debug_test.cpp $(CORE_SOURCES) $(DEBUG_SOURCES) $(EFI_LIBS)
 
 test: $(TEST_TARGETS)
 	build/tests/protocol_test

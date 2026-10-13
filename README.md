@@ -48,7 +48,7 @@ boot
 
 ## Build
 
-The build targets x86_64 UEFI and requires a C++23 compiler and GNU-EFI.
+The build targets x86_64 UEFI and requires GCC with C++23/LTO support and GNU-EFI.
 `make` produces one `apple_set_os.efi` (EFI application) in the repository root.
 
 ### Debian (x86_64)
@@ -65,12 +65,24 @@ make
 
 ### Docker
 
-The Dockerfile uses Debian Trixie. From the repository root, with Docker running
-Linux containers (the commands work in Bash and PowerShell):
+The Dockerfile uses Debian Trixie and builds the latest available GNU-EFI source
+package from its configured repositories with `-Os` and LTO. APT verifies the
+downloads, and Debian patches are applied normally. The normal GNU-EFI formatter,
+startup and linker script are retained. A package-only Debian build also works,
+but its prebuilt GNU-EFI library limits the size reduction.
+
+From the repository root, with Docker running Linux containers (the commands
+work in Bash and PowerShell):
 
 ```sh
 docker build -t apple_set_os .
 docker run --rm --mount type=bind,source=.,target=/build apple_set_os sh -c "make clean && make test && make"
+```
+
+To refresh the GNU-EFI source package instead of reusing Docker's cached build:
+
+```sh
+docker build --no-cache-filter gnu-efi-build -t apple_set_os .
 ```
 
 The repository is [bind-mounted](https://docs.docker.com/engine/storage/bind-mounts/)

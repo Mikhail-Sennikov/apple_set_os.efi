@@ -32,7 +32,7 @@ as a chainloader menu entry. Load only one copy of Apple Set OS.
 
 ### rEFInd and GRUB (EFI application)
 
-Copy the apple_set_os.efi binary (download it from [releases](https://github.com/0xbb/apple_set_os.efi/releases)) to EFI System Partition (ESP) :
+Copy the apple_set_os.efi binary (download it from [releases](https://github.com/Mikhail-Sennikov/apple_set_os.efi/releases)) to EFI System Partition (ESP) :
 ```
 mkdir /boot/efi/EFI/custom
 cp apple_set_os.efi /boot/efi/EFI/custom
@@ -46,9 +46,42 @@ chainloader (${root})/EFI/custom/apple_set_os.efi
 boot
 ```
 
+### Optional file log
+
+Console logging is always enabled. To also append the log to a file, set the
+UEFI variable `AppleSetOsLogPath` under GUID
+`80f05b32-6ba8-4c7e-ba1b-402357ff91d8`. Its value is an absolute EFI path encoded
+as NUL-terminated UTF-16LE, with attributes
+`NON_VOLATILE | BOOTSERVICE_ACCESS | RUNTIME_ACCESS` (`7`).
+
+The path refers to the filesystem from which `apple_set_os.efi` was loaded, not
+a Windows drive letter. For example, `\EFI\apple-set-os.log` uses the same ESP
+as the application, regardless of the bootloader.
+
+On Windows, from the repository root (approve the administrator prompt):
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File tools/Set-LogPath.ps1 -Path '\EFI\apple-set-os.log'
+```
+
+To disable file logging, delete only this variable:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File tools/Set-LogPath.ps1 -Disable
+```
+
+The variable is read and the file is opened lazily on the first nonempty log
+message. The file is UTF-16LE with a BOM and is appended across boots. Parent
+directories must already exist. Existing nonempty files without a UTF-16LE BOM
+are left unchanged. Writes are flushed before execution continues, and the file is closed
+before the application returns. If the variable is absent, there are no file
+operations or additional formatting allocations. Configuration or file errors
+leave console logging and the Apple OS Info operation intact.
+
 ## Build
 
-The build targets x86_64 UEFI and requires GCC with C++23/LTO support and GNU-EFI.
+The build targets x86_64 UEFI and requires GCC with C++23/LTO support and GNU-EFI
+3.0.18 or newer. The logger uses the image handle saved by GNU-EFI's standard entry.
 `make` produces one `apple_set_os.efi` (EFI application) in the repository root.
 
 ### Debian (x86_64)
